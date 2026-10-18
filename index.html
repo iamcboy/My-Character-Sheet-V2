@@ -85,7 +85,7 @@ body {
   font-size: 15px;
   line-height: 1.5;
   margin: 0;
-  padding-block: 20px 40px;
+  padding-block: max(20px, env(safe-area-inset-top, 0px)) max(40px, env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
@@ -207,6 +207,12 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
 @media (max-width: 520px) {
   .erow { grid-template-columns: minmax(0, 1fr) auto; }
   .erow > .in:first-child { grid-column: 1 / -1; }
+  .bar { align-items: flex-start; }
+  .status { overflow-wrap: anywhere; }
+  .btn { min-height: 44px; padding: 10px 14px; }
+  .sw { width: 36px; height: 36px; }
+  .in { min-height: 44px; font-size: 16px; }
+  .quest { min-height: 64px; }
 }
 @media (max-width: 420px) {
   h1 { font-size: 26px; }
