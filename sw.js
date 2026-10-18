@@ -1,4 +1,4 @@
-const CACHE = "kosi-character-sheet-v3";
+const CACHE = "kosi-character-sheet-v4";
 const APP_FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {

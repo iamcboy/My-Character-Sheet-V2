@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Kosi's Character Sheet",
-  "short_name": "Kosi Sheet",
+  "name": "My Character Sheet",
+  "short_name": "Character Sheet",
   "description": "Track daily quests, XP, levels, and personal growth.",
   "start_url": "./",
   "scope": "./",
