@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kosi's Character Sheet</title>
+<meta name="theme-color" content="#e9edf0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kosi Sheet">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* Layout: a top bar (sync status + Customize), then two columns on wide screens. Left holds the character card and today's quests grouped by stat; right holds stat levels, the 7-day log and the current book. One column on phones. */
+:root {
+  --bg: #e9edf0;
+  --surface: #f9fafb;
+  --ink: #141a20;
+  --muted: #56636f;
+  --line: #d0d7dd;
+  --xp: #a86d00;
+  --xp-fill: #e3a01b;
+  --str: #c4412a;
+  --int: #2a5fc6;
+  --foc: #0d8672;
+  --spi: #7448bd;
+  --pnk: #b03a78;
+  --cyn: #137f9c;
+  --oli: #5c7a14;
+  --stl: #5d6b7a;
+  --on-fill: #ffffff;
+  --font-display: "Press Start 2P", "Courier New", monospace;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1217;
+    --surface: #171d24;
+    --ink: #e8ecef;
+    --muted: #93a0ab;
+    --line: #2a333c;
+    --xp: #f0b43a;
+    --xp-fill: #f0b43a;
+    --str: #ef7a5f;
+    --int: #6f9cf2;
+    --foc: #38c2a8;
+    --spi: #a98bea;
+    --pnk: #e47fb2;
+    --cyn: #55c0de;
+    --oli: #a6c657;
+    --stl: #9db0c2;
+    --on-fill: #0e1217;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1217;
+  --surface: #171d24;
+  --ink: #e8ecef;
+  --muted: #93a0ab;
+  --line: #2a333c;
+  --xp: #f0b43a;
+  --xp-fill: #f0b43a;
+  --str: #ef7a5f;
+  --int: #6f9cf2;
+  --foc: #38c2a8;
+  --spi: #a98bea;
+  --pnk: #e47fb2;
+  --cyn: #55c0de;
+  --oli: #a6c657;
+  --stl: #9db0c2;
+  --on-fill: #0e1217;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.page { max-width: 980px; margin: 0 auto; }
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; min-height: 34px; }
+.wrap { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 860px) {
+  .wrap { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+}
+.col { display: grid; gap: 16px; min-width: 0; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 20px; min-width: 0; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0; }
+h1, h2 { margin: 0; text-wrap: balance; }
+h2 { font-size: 13px; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+/* controls */
+.btn {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 4px;
+  padding: 7px 12px; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { border-color: var(--ink); }
+.btn:focus-visible { outline: 2px solid var(--int); outline-offset: 2px; }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.btn[disabled]:hover { border-color: var(--line); }
+.in {
+  width: 100%; min-width: 0; font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 9px 11px;
+}
+.in:focus-visible { outline: 2px solid var(--int); outline-offset: 1px; }
+select.in { width: auto; max-width: 100%; }
+.fl { display: block; margin: 12px 0 4px; font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.hint { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+.sws { display: flex; flex-wrap: wrap; gap: 6px; }
+.sw { width: 24px; height: 24px; border-radius: 3px; border: 2px solid transparent; background: var(--c); cursor: pointer; padding: 0; }
+.sw[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 2px var(--surface); }
+.sw:focus-visible { outline: 2px solid var(--int); outline-offset: 2px; }
+
+/* character card */
+.who { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.who > div:first-child { flex: 1 1 200px; min-width: 0; }
+h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.1; margin-top: 6px; overflow-wrap: anywhere; }
+.klass { color: var(--muted); margin: 4px 0 0; overflow-wrap: anywhere; }
+.lv { text-align: right; }
+.lv .tag { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--muted); }
+.lv .num { font-family: var(--font-display); font-size: 40px; line-height: 1; color: var(--xp); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.xprow { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; gap: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.xprow b { color: var(--ink); font-weight: 500; }
+.pips { display: flex; gap: 3px; margin-top: 8px; }
+.pips i { flex: 1; height: 12px; background: var(--line); border-radius: 1px; }
+.pips i.on { background: var(--c, var(--xp-fill)); }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.fact .v { font-family: var(--font-mono); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.fact .l { font-size: 12px; color: var(--muted); }
+.note { min-height: 0; margin: 14px 0 0; padding: 8px 12px; border: 1px solid var(--xp-fill); border-radius: 4px; color: var(--ink); font-size: 14px; }
+.note[hidden] { display: none; }
+
+/* quests */
+.qhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.qhead .date { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.grp { margin-top: 18px; }
+.grp:first-child { margin-top: 14px; }
+.ghead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.gcount { font-family: var(--font-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.qlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.quest {
+  width: 100%; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  text-align: left; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+  padding: 12px 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+}
+.quest:hover { border-color: var(--c); }
+.quest:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+.box { width: 30px; height: 30px; border: 2px solid var(--c); border-radius: 3px; display: grid; place-items: center; color: var(--on-fill); }
+.box svg { width: 18px; height: 18px; opacity: 0; }
+.quest[aria-pressed="true"] .box { background: var(--c); }
+.quest[aria-pressed="true"] .box svg { opacity: 1; }
+.quest[aria-pressed="true"] .task { color: var(--muted); }
+.stat { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c); font-weight: 500; overflow-wrap: anywhere; }
+.task { display: block; font-size: 15px; overflow-wrap: anywhere; }
+.reward { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.quest[aria-pressed="true"] .reward { color: var(--c); }
+.rule { margin: 16px 0 0; font-size: 13px; color: var(--muted); }
+.empty { margin: 14px 0 0; color: var(--muted); }
+
+/* quest editing */
+.elist { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.erow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.addbox { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.addbox .erow { margin-top: 8px; }
+
+/* stats */
+.statlist { display: grid; gap: 16px; margin-top: 14px; }
+.srow .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.srow .name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.srow .name span { color: var(--c); }
+.srow .lvl { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.srow .pips i { height: 8px; }
+.sedit { display: grid; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.sedit .line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+
+/* week */
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
+.day { text-align: center; padding: 8px 0 6px; border: 1px solid transparent; border-radius: 4px; }
+.day.today { border-color: var(--xp-fill); }
+.day .dn { font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.day .grid { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; margin: 6px auto 0; max-width: 24px; }
+.day .grid i { width: 9px; height: 9px; background: var(--line); border-radius: 1px; }
+.day .grid i.on { background: var(--c); }
+
+/* book */
+.book label { display: block; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.book .in { margin-top: 6px; }
+.book p { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+
+.status { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+
+@media (max-width: 520px) {
+  .erow { grid-template-columns: minmax(0, 1fr) auto; }
+  .erow > .in:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 420px) {
+  h1 { font-size: 26px; }
+  .lv .num { font-size: 32px; }
+  .quest { grid-template-columns: 28px minmax(0, 1fr); }
+  .reward { grid-column: 2; }
+  .panel { padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .quest { transition: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="bar">
+    <div class="status" id="status" aria-live="polite"></div>
+    <button type="button" class="btn" id="editBtn" data-act="toggle-edit" aria-pressed="false">Customize</button>
+  </div>
+
+  <main class="wrap">
+    <div class="col">
+      <section class="panel" aria-label="Character sheet">
+        <div class="who">
+          <div id="whoBlock"></div>
+          <div class="lv" aria-label="Level">
+            <div class="tag">LEVEL</div>
+            <div class="num" id="lvnum">1</div>
+          </div>
+        </div>
+        <div class="xprow"><span><b id="xpnow">0</b> / 20 XP to next level</span><span id="xptotal"></span></div>
+        <div class="pips" id="xppips" role="img" aria-label="XP progress"></div>
+        <div class="facts">
+          <div class="fact"><div class="v" id="fstreak">0</div><div class="l">Day streak</div></div>
+          <div class="fact"><div class="v" id="fperfect">0</div><div class="l">Perfect days</div></div>
+          <div class="fact"><div class="v" id="ftotal">0</div><div class="l">Quests done</div></div>
+        </div>
+        <p class="note" id="note" role="status" aria-live="polite" hidden></p>
+      </section>
+
+      <section class="panel" aria-labelledby="qh">
+        <div class="qhead">
+          <h2 id="qh">Today's quests</h2>
+          <span class="date" id="qmeta"></span>
+        </div>
+        <div id="quests"></div>
+        <p class="rule" id="rule"></p>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel" aria-labelledby="sh">
+        <h2 id="sh">Stats</h2>
+        <div class="statlist" id="stats"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="wh">
+        <h2 id="wh">Last 7 days</h2>
+        <div class="week" id="week"></div>
+      </section>
+
+      <section class="panel book" aria-labelledby="bh">
+        <h2 id="bh">Current book</h2>
+        <label for="book">What are you reading right now?</label>
+        <input id="book" class="in" data-field="book" type="text" maxlength="120" placeholder="Pick one you actually want to finish" autocomplete="off">
+        <p>Short and practical works best for the first one. Finishing early gives you a quick win.</p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  var COLORS = ["str", "int", "foc", "spi", "pnk", "cyn", "oli", "stl"];
+  var COLOR_NAMES = { str: "Red", int: "Blue", foc: "Teal", spi: "Violet", pnk: "Pink", cyn: "Cyan", oli: "Olive", stl: "Steel" };
+  // Default quests scale with level. Their text is looked up by quest id until you edit it.
+  var TIERS = [
+    { str: "10 pushups + 10 squats, or a 15-minute walk", int: "Read 5 pages", foc: "One 20-minute block, phone in another room", spi: "5 to 10 minutes of quiet time" },
+    { str: "15 pushups + 15 squats, or a 20-minute walk", int: "Read 10 pages", foc: "One 30-minute block, phone in another room", spi: "10 minutes of quiet time" },
+    { str: "20 pushups + 20 squats, or a 25-minute brisk walk", int: "Read 15 pages", foc: "One 40-minute block, phone in another room", spi: "15 minutes of quiet time" },
+    { str: "25 pushups + 25 squats, or a 30-minute walk or jog", int: "Read 20 pages", foc: "One 45-minute block, phone in another room", spi: "20 minutes of quiet time" },
+    { str: "30 pushups + 30 squats, or a 30-minute run", int: "Read 25 pages", foc: "One 60-minute block, phone in another room", spi: "20 to 30 minutes of quiet time" }
+  ];
+  var ID_RE = /^[a-z0-9_]{1,40}$/, DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  var XP_PER_LEVEL = 20, STAT_LEVEL = 10, KEEP_DAYS = 120, MAX_STATS = 8, MAX_QUESTS = 24;
+  var LS_KEY = "kosi-character-sheet-v1";
+  var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+  function defaults() {
+    return {
+      v: 2,
+      profile: { name: "Kosi", klass: "Self-Improver" },
+      stats: [
+        { id: "str", name: "Strength", color: "str" },
+        { id: "int", name: "Intelligence", color: "int" },
+        { id: "foc", name: "Focus", color: "foc" },
+        { id: "spi", name: "Spirit", color: "spi" }
+      ],
+      quests: [
+        { id: "str", stat: "str", text: "", auto: true },
+        { id: "int", stat: "int", text: "", auto: true },
+        { id: "foc", stat: "foc", text: "", auto: true },
+        { id: "spi", stat: "spi", text: "", auto: true }
+      ],
+      log: {},
+      perfect: [],
+      book: ""
+    };
+  }
+
+  var state = defaults();
+  var ref = null;
+  var editing = false;
+  var newQ = { text: "", stat: "str" };
+  var newS = { name: "", color: "pnk" };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
+  }
+  function uid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function keyOf(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function dayOffset(n) { var d = new Date(); d.setDate(d.getDate() + n); return d; }
+  function cv(c) { return "var(--" + c + ")"; }
+
+  /* ---------- data ---------- */
+  function normalize(raw) {
+    var out = defaults();
+    if (!raw || typeof raw !== "object") return out;
+    if (typeof raw.book === "string") out.book = raw.book.slice(0, 120);
+    if (raw.profile && typeof raw.profile === "object") {
+      if (typeof raw.profile.name === "string" && raw.profile.name.trim()) out.profile.name = raw.profile.name.slice(0, 30);
+      if (typeof raw.profile.klass === "string") out.profile.klass = raw.profile.klass.slice(0, 40);
+    }
+    if (Array.isArray(raw.stats) && raw.stats.length) {
+      var seen = {}, st = [];
+      raw.stats.forEach(function (s) {
+        if (!s || typeof s !== "object" || !ID_RE.test(s.id) || seen[s.id]) return;
+        seen[s.id] = 1;
+        st.push({ id: s.id, name: String(s.name || "Stat").slice(0, 24), color: COLORS.indexOf(s.color) > -1 ? s.color : "stl", archived: !!s.archived });
+      });
+      if (st.some(function (s) { return !s.archived; })) out.stats = st;
+    }
+    var statIds = {};
+    out.stats.forEach(function (s) { statIds[s.id] = 1; });
+    var hasQuests = Array.isArray(raw.quests);
+    if (hasQuests) {
+      var qs = [], qseen = {};
+      raw.quests.forEach(function (q) {
+        if (!q || typeof q !== "object" || !ID_RE.test(q.id) || qseen[q.id] || !statIds[q.stat]) return;
+        qseen[q.id] = 1;
+        qs.push({ id: q.id, stat: q.stat, text: String(q.text || "").slice(0, 80), auto: !!q.auto, archived: !!q.archived });
+      });
+      out.quests = qs;
+    }
+    var log = raw.log && typeof raw.log === "object" ? raw.log : {};
+    Object.keys(log).forEach(function (k) {
+      if (!DATE_RE.test(k) || !Array.isArray(log[k])) return;
+      var s2 = {}, arr = [];
+      log[k].forEach(function (id) { if (typeof id === "string" && ID_RE.test(id) && !s2[id]) { s2[id] = 1; arr.push(id); } });
+      if (arr.length) out.log[k] = arr;
+    });
+    if (Array.isArray(raw.perfect)) {
+      out.perfect = raw.perfect.filter(function (k) { return typeof k === "string" && DATE_RE.test(k); });
+    } else if (!hasQuests) {
+      // Saved before customizing existed: a perfect day had all four default quests done.
+      Object.keys(out.log).forEach(function (k) { if (out.log[k].length >= 4) out.perfect.push(k); });
+    }
+    return out;
+  }
+
+  function qmap() { var m = {}; state.quests.forEach(function (q) { m[q.id] = q; }); return m; }
+  function activeStats() { return state.stats.filter(function (s) { return !s.archived; }); }
+  function activeQuests() {
+    var out = [];
+    activeStats().forEach(function (s) {
+      state.quests.forEach(function (q) { if (q.stat === s.id && !q.archived) out.push(q); });
+    });
+    return out;
+  }
+  function doneOn(k) { var m = qmap(); return (state.log[k] || []).filter(function (id) { return m[id]; }); }
+
+  function totals() {
+    var m = qmap(), xp = 0, per = {};
+    Object.keys(state.log).forEach(function (k) {
+      state.log[k].forEach(function (id) {
+        var q = m[id];
+        if (!q) return;
+        xp++;
+        per[q.stat] = (per[q.stat] || 0) + 1;
+      });
+    });
+    return { xp: xp, per: per };
+  }
+  function levelOf(xp) { return 1 + Math.floor(xp / XP_PER_LEVEL); }
+  function questText(q, level) {
+    if (q.auto) { var t = TIERS[Math.min(level, TIERS.length) - 1][q.id]; if (t) return t; }
+    return q.text || "";
+  }
+  function streak() {
+    var d = new Date(), n = 0;
+    if (!doneOn(keyOf(d)).length) d.setDate(d.getDate() - 1);
+    while (doneOn(keyOf(d)).length) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  function syncPerfectToday() {
+    var k = keyOf(new Date()), aq = activeQuests(), done = doneOn(k);
+    var ok = aq.length > 0 && aq.every(function (q) { return done.indexOf(q.id) > -1; });
+    var i = state.perfect.indexOf(k);
+    if (ok && i < 0) state.perfect.push(k);
+    if (!ok && i > -1) state.perfect.splice(i, 1);
+  }
+  function prune() {
+    var cutoff = keyOf(dayOffset(-KEEP_DAYS));
+    Object.keys(state.log).forEach(function (k) { if (k < cutoff) delete state.log[k]; });
+    state.perfect = state.perfect.filter(function (k) { return k >= cutoff; });
+  }
+  function nextColor() {
+    var used = {};
+    activeStats().forEach(function (s) { used[s.color] = 1; });
+    for (var i = 0; i < COLORS.length; i++) if (!used[COLORS[i]]) return COLORS[i];
+    return COLORS[0];
+  }
+
+  /* ---------- rendering ---------- */
+  function pips(total, on, color) {
+    var h = "";
+    for (var i = 0; i < total; i++) h += '<i class="' + (i < on ? "on" : "") + '"' + (color ? ' style="--c:' + color + '"' : "") + "></i>";
+    return h;
+  }
+  function statSelect(selected, field, qid) {
+    return '<select class="in" data-field="' + field + '"' + (qid ? ' data-q="' + qid + '"' : "") + ' aria-label="Stat for this quest"' + (field === "newqstat" ? ' id="newQStat"' : "") + ">" +
+      activeStats().map(function (s) {
+        return '<option value="' + s.id + '" data-s="' + s.id + '"' + (s.id === selected ? " selected" : "") + ">" + esc(s.name) + "</option>";
+      }).join("") + "</select>";
+  }
+  function swatches(selected, act, sid) {
+    return '<div class="sws" role="group" aria-label="Color">' + COLORS.map(function (c) {
+      return '<button type="button" class="sw" style="--c:' + cv(c) + '" data-act="' + act + '" data-c="' + c + '"' + (sid ? ' data-s="' + sid + '"' : "") +
+        ' aria-pressed="' + (c === selected) + '" aria-label="' + COLOR_NAMES[c] + '"></button>';
+    }).join("") + "</div>";
+  }
+
+  function renderCard(t, level) {
+    var into = t.xp % XP_PER_LEVEL;
+    $("lvnum").textContent = level;
+    $("xpnow").textContent = into;
+    $("xptotal").textContent = t.xp + " XP total";
+    $("xppips").innerHTML = pips(XP_PER_LEVEL, into);
+    $("fstreak").textContent = streak();
+    $("fperfect").textContent = state.perfect.length;
+    $("ftotal").textContent = t.xp;
+    if (editing) {
+      $("whoBlock").innerHTML = '<p class="eyebrow">Character sheet</p>' +
+        '<label class="fl" for="inName">Name</label><input id="inName" class="in" data-field="name" maxlength="30" value="' + esc(state.profile.name) + '" autocomplete="off">' +
+        '<label class="fl" for="inKlass">Description</label><input id="inKlass" class="in" data-field="klass" maxlength="40" value="' + esc(state.profile.klass) + '" placeholder="e.g. Self-Improver" autocomplete="off">';
+    } else {
+      $("whoBlock").innerHTML = '<p class="eyebrow">Character sheet</p><h1>' + esc(state.profile.name) + "</h1>" +
+        (state.profile.klass ? '<p class="klass">' + esc(state.profile.klass) + "</p>" : "");
+    }
+  }
+
+  function renderQuests(level) {
+    var aq = activeQuests();
+    if (editing) {
+      $("qh").textContent = "Edit quests";
+      $("qmeta").textContent = aq.length + " active";
+      var rows = aq.map(function (q) {
+        return '<li class="erow"><input class="in" data-field="qtext" data-q="' + q.id + '" maxlength="80" value="' + esc(questText(q, level)) + '" aria-label="Quest" autocomplete="off">' +
+          statSelect(q.stat, "qstat", q.id) +
+          '<button type="button" class="btn" data-act="del-quest" data-q="' + q.id + '">Remove</button></li>';
+      }).join("");
+      if (!newQ.stat || !activeStats().some(function (s) { return s.id === newQ.stat; })) newQ.stat = activeStats()[0].id;
+      $("quests").innerHTML = (rows ? '<ul class="elist">' + rows + "</ul>" : '<p class="empty">No quests yet. Add your first one below.</p>') +
+        '<div class="addbox"><label class="fl" for="newQ">New quest</label><div class="erow">' +
+        '<input id="newQ" class="in" data-field="newq" maxlength="80" value="' + esc(newQ.text) + '" placeholder="e.g. Drink 2 litres of water" autocomplete="off">' +
+        statSelect(newQ.stat, "newqstat", "") +
+        '<button type="button" class="btn primary" data-act="add-quest">Add quest</button></div></div>';
+      $("rule").textContent = "Pick the stat each quest belongs to. Starter quests get harder as you level; editing one keeps your own wording. Removed quests keep the XP you already earned.";
+      return;
+    }
+    $("qh").textContent = "Today's quests";
+    $("qmeta").textContent = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) + " · " + doneOn(keyOf(new Date())).filter(function (id) { return aq.some(function (q) { return q.id === id; }); }).length + "/" + aq.length;
+    var done = {};
+    doneOn(keyOf(new Date())).forEach(function (id) { done[id] = 1; });
+    var html = activeStats().map(function (s) {
+      var qs = aq.filter(function (q) { return q.stat === s.id; });
+      if (!qs.length) return "";
+      var n = qs.filter(function (q) { return done[q.id]; }).length;
+      return '<section class="grp" style="--c:' + cv(s.color) + '"><div class="ghead"><span class="stat">' + esc(s.name) + '</span><span class="gcount">' + n + "/" + qs.length + '</span></div><ul class="qlist">' +
+        qs.map(function (q) {
+          return '<li><button type="button" class="quest" data-act="quest" data-q="' + q.id + '" aria-pressed="' + !!done[q.id] + '">' +
+            '<span class="box">' + CHECK + '</span><span class="task">' + esc(questText(q, level)) + '</span><span class="reward">+1 XP</span></button></li>';
+        }).join("") + "</ul></section>";
+    }).join("");
+    $("quests").innerHTML = html || '<p class="empty">No quests yet. Tap Customize to add your first one.</p>';
+    $("rule").textContent = "Each quest is worth 1 XP. Every " + XP_PER_LEVEL + " XP is a new level. Miss a day? Skip it and start fresh tomorrow. No catch-up.";
+  }
+
+  function renderStats(t) {
+    var as = activeStats();
+    if (editing) {
+      $("stats").innerHTML = as.map(function (s) {
+        return '<div class="sedit"><div class="line"><input class="in" data-field="sname" data-s="' + s.id + '" maxlength="24" value="' + esc(s.name) + '" aria-label="Stat name" autocomplete="off">' +
+          '<button type="button" class="btn" data-act="del-stat" data-s="' + s.id + '"' + (as.length <= 1 ? " disabled" : "") + ">Remove</button></div>" +
+          swatches(s.color, "color", s.id) + "</div>";
+      }).join("") +
+        '<div class="addbox" style="margin-top:0;border-top:0;padding-top:0"><label class="fl" for="newS">New stat</label><input id="newS" class="in" data-field="news" maxlength="24" value="' + esc(newS.name) + '" placeholder="e.g. Discipline" autocomplete="off">' +
+        '<div style="margin-top:8px">' + swatches(newS.color, "newcolor", "") + '</div>' +
+        '<div style="margin-top:10px"><button type="button" class="btn primary" data-act="add-stat">Add stat</button></div>' +
+        '<p class="hint">Removing a stat hides it and its quests. The XP you earned stays.</p></div>';
+      return;
+    }
+    $("stats").innerHTML = as.map(function (s) {
+      var n = t.per[s.id] || 0;
+      return '<div class="srow" style="--c:' + cv(s.color) + '"><div class="top"><span class="name"><span>' + esc(s.name) + "</span></span>" +
+        '<span class="lvl">LV ' + (1 + Math.floor(n / STAT_LEVEL)) + " · " + (n % STAT_LEVEL) + "/" + STAT_LEVEL + "</span></div>" +
+        '<div class="pips" role="img" aria-label="' + esc(s.name) + ' progress">' + pips(STAT_LEVEL, n % STAT_LEVEL, cv(s.color)) + "</div></div>";
+    }).join("");
+  }
+
+  function renderWeek() {
+    var aq = activeQuests(), wk = "";
+    for (var i = 6; i >= 0; i--) {
+      var d = dayOffset(-i), done = doneOn(keyOf(d));
+      var cells = aq.map(function (q) {
+        var st = state.stats.filter(function (s) { return s.id === q.stat; })[0];
+        return '<i class="' + (done.indexOf(q.id) > -1 ? "on" : "") + '" style="--c:' + cv(st ? st.color : "stl") + '"></i>';
+      }).join("");
+      wk += '<div class="day' + (i === 0 ? " today" : "") + '"><div class="dn">' +
+        d.toLocaleDateString("en-GB", { weekday: "short" }).slice(0, 3) + '</div><div class="grid">' + cells + "</div></div>";
+    }
+    $("week").innerHTML = wk;
+  }
+
+  function render() {
+    var t = totals(), level = levelOf(t.xp);
+    $("editBtn").textContent = editing ? "Done" : "Customize";
+    $("editBtn").setAttribute("aria-pressed", editing);
+    renderCard(t, level);
+    renderQuests(level);
+    renderStats(t);
+    renderWeek();
+  }
+
+  /* ---------- saving ---------- */
+  function setStatus(msg) { $("status").textContent = msg; }
+  function writeLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+  function readLocal() { try { var r = localStorage.getItem(LS_KEY); return r ? normalize(JSON.parse(r)) : null; } catch (e) { return null; } }
+
+  var saving = false, dirty = false, soonTimer = null;
+  function persist() {
+    writeLocal();
+    dirty = true;
+    if (saving) return;
+    saving = true;
+    (async function () {
+      while (dirty) {
+        dirty = false;
+        if (!ref) { setStatus("Saved on this device"); continue; }
+        setStatus("Saving...");
+        try { await ref.set(JSON.parse(JSON.stringify(state))); setStatus("Saved"); }
+        catch (e) { setStatus("Could not sync. Saved on this device."); }
+      }
+      saving = false;
+    })();
+  }
+  function persistSoon() { clearTimeout(soonTimer); soonTimer = setTimeout(persist, 700); }
+
+  /* ---------- actions ---------- */
+  function findQuest(id) { return state.quests.filter(function (q) { return q.id === id; })[0]; }
+  function findStat(id) { return state.stats.filter(function (s) { return s.id === id; })[0]; }
+
+  function toggleQuest(id) {
+    var today = keyOf(new Date());
+    var before = totals().xp;
+    var arr = (state.log[today] || []).slice();
+    var at = arr.indexOf(id);
+    if (at === -1) arr.push(id); else arr.splice(at, 1);
+    if (arr.length) state.log[today] = arr; else delete state.log[today];
+    syncPerfectToday();
+    prune();
+    var after = totals().xp, note = $("note");
+    if (Math.floor(after / XP_PER_LEVEL) > Math.floor(before / XP_PER_LEVEL)) {
+      note.textContent = "Level up. You are now level " + levelOf(after) + ". Your starter quests are a notch harder.";
+      note.hidden = false;
+    } else if (state.perfect.indexOf(today) > -1) {
+      note.textContent = "Perfect day. All " + activeQuests().length + " quests done.";
+      note.hidden = false;
+    } else {
+      note.hidden = true;
+    }
+    render();
+    var again = document.querySelector('.quest[data-q="' + id + '"]');
+    if (again) again.focus();
+    persist();
+  }
+
+  function addQuest() {
+    var text = newQ.text.trim();
+    if (!text) { setStatus("Write the quest first."); $("newQ").focus(); return; }
+    if (activeQuests().length >= MAX_QUESTS) { setStatus("That is the limit of " + MAX_QUESTS + " quests."); return; }
+    state.quests.push({ id: uid("q"), stat: newQ.stat, text: text.slice(0, 80), auto: false });
+    newQ.text = "";
+    syncPerfectToday();
+    render();
+    setStatus("Quest added.");
+    $("newQ").focus();
+    persist();
+  }
+
+  function addStat() {
+    var name = newS.name.trim();
+    if (!name) { setStatus("Name the stat first."); $("newS").focus(); return; }
+    if (activeStats().length >= MAX_STATS) { setStatus("That is the limit of " + MAX_STATS + " stats."); return; }
+    state.stats.push({ id: uid("s"), name: name.slice(0, 24), color: newS.color });
+    newS.name = "";
+    newS.color = nextColor();
+    render();
+    setStatus("Stat added. Pick it when you add a quest.");
+    $("newS").focus();
+    persist();
+  }
+
+  document.addEventListener("click", function (ev) {
+    var el = ev.target.closest("[data-act]");
+    if (!el || el.disabled) return;
+    var act = el.getAttribute("data-act");
+    var q = el.getAttribute("data-q"), s = el.getAttribute("data-s"), c = el.getAttribute("data-c");
+    if (act === "toggle-edit") { editing = !editing; $("note").hidden = true; render(); setStatus(""); }
+    else if (act === "quest") toggleQuest(q);
+    else if (act === "del-quest") {
+      var qq = findQuest(q);
+      if (qq) { qq.archived = true; syncPerfectToday(); render(); persist(); }
+    }
+    else if (act === "add-quest") addQuest();
+    else if (act === "del-stat") {
+      var st = findStat(s);
+      if (st && activeStats().length > 1) {
+        st.archived = true;
+        state.quests.forEach(function (x) { if (x.stat === s) x.archived = true; });
+        syncPerfectToday(); render(); persist();
+      }
+    }
+    else if (act === "color") {
+      var st2 = findStat(s);
+      if (st2 && COLORS.indexOf(c) > -1) { st2.color = c; render(); persist(); }
+    }
+    else if (act === "newcolor") {
+      if (COLORS.indexOf(c) > -1) {
+        newS.color = c;
+        Array.prototype.forEach.call(document.querySelectorAll('[data-act="newcolor"]'), function (b) {
+          b.setAttribute("aria-pressed", b.getAttribute("data-c") === c);
+        });
+      }
+    }
+    else if (act === "add-stat") addStat();
+  });
+
+  document.addEventListener("input", function (ev) {
+    var t = ev.target, f = t.getAttribute && t.getAttribute("data-field");
+    if (!f) return;
+    if (f === "name") { state.profile.name = t.value.slice(0, 30); persistSoon(); }
+    else if (f === "klass") { state.profile.klass = t.value.slice(0, 40); persistSoon(); }
+    else if (f === "book") { state.book = t.value.slice(0, 120); persistSoon(); }
+    else if (f === "qtext") {
+      var q = findQuest(t.getAttribute("data-q"));
+      if (q) { q.text = t.value.slice(0, 80); q.auto = false; persistSoon(); }
+    }
+    else if (f === "sname") {
+      var s = findStat(t.getAttribute("data-s"));
+      if (s) { s.name = t.value.slice(0, 24); persistSoon(); }
+    }
+    else if (f === "newq") newQ.text = t.value;
+    else if (f === "news") newS.name = t.value;
+  });
+
+  document.addEventListener("change", function (ev) {
+    var t = ev.target, f = t.getAttribute && t.getAttribute("data-field");
+    if (!f) return;
+    if (f === "qstat") {
+      var q = findQuest(t.getAttribute("data-q"));
+      if (q) { q.stat = t.value; syncPerfectToday(); render(); persist(); }
+    }
+    else if (f === "newqstat") newQ.stat = t.value;
+    else if (f === "qtext") {
+      var q2 = findQuest(t.getAttribute("data-q"));
+      if (q2 && !t.value.trim()) { q2.text = "Untitled quest"; q2.auto = false; t.value = q2.text; persist(); }
+    }
+    else if (f === "sname") {
+      var s = findStat(t.getAttribute("data-s"));
+      if (s) {
+        if (!t.value.trim()) { s.name = "Stat"; t.value = s.name; }
+        Array.prototype.forEach.call(document.querySelectorAll('option[data-s="' + s.id + '"]'), function (o) { o.textContent = s.name; });
+        persist();
+      }
+    }
+    else if (f === "name" && !t.value.trim()) { state.profile.name = "Player"; t.value = "Player"; persist(); }
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Enter") return;
+    var f = ev.target.getAttribute && ev.target.getAttribute("data-field");
+    if (f === "newq") { ev.preventDefault(); addQuest(); }
+    else if (f === "news") { ev.preventDefault(); addStat(); }
+  });
+
+  /* ---------- start ---------- */
+  var local = readLocal();
+  if (local) state = local;
+  newS.color = nextColor();
+  newQ.stat = activeStats()[0].id;
+  $("book").value = state.book;
+  syncPerfectToday();
+  render();
+  setStatus("");
+
+  (async function sync() {
+    try {
+      if (!window.claude || !window.claude.use) { setStatus("Saved on this device"); return; }
+      var user = await window.claude.use("user");
+      var uid2 = user ? await user.id() : null;
+      var db = await window.claude.use("db");
+      if (!db || !uid2) { setStatus("Saved on this device"); return; }
+      ref = db.doc("data/users/" + uid2 + "/tracker");
+      var snap = await ref.get();
+      if (snap.exists) {
+        state = normalize(snap.data());
+        newS.color = nextColor();
+        newQ.stat = activeStats()[0].id;
+        $("book").value = state.book;
+        syncPerfectToday();
+        writeLocal();
+        render();
+        setStatus("Synced");
+      } else if (local && (Object.keys(local.log).length || local.book)) {
+        persist();
+      } else {
+        setStatus("Ready. Your progress saves as you go.");
+      }
+    } catch (e) { setStatus("Saved on this device"); }
+  })();
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("./sw.js").catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
