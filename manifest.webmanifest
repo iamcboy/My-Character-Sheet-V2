@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "My Character Sheet",
+  "short_name": "Character Sheet",
+  "description": "Track daily quests, XP, levels, and personal growth.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#e9edf0",
+  "theme_color": "#e9edf0",
+  "icons": [
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
