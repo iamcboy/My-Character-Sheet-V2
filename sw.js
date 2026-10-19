@@ -1,4 +1,4 @@
-const CACHE = "kosi-character-sheet-v4";
+const CACHE = "kosi-character-sheet-v5";
 const APP_FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -21,8 +21,11 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
+      // Revalidate with the server so a mobile browser's HTTP cache cannot
+      // keep serving an older app shell after a deployment.
+      fetch(new Request(request, { cache: "no-cache" }))
         .then((response) => {
+          if (!response.ok) throw new Error("Page request failed");
           const copy = response.clone();
           caches.open(CACHE).then((cache) => cache.put("./index.html", copy));
           return response;

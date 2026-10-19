@@ -876,7 +876,21 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("./sw.js").catch(function () {});
+      var hadController = !!navigator.serviceWorker.controller;
+      var refreshing = false;
+      navigator.serviceWorker.addEventListener("controllerchange", function () {
+        // Existing installs should show the newly activated app shell. Avoid
+        // an unnecessary reload the first time the app gains a controller.
+        if (hadController && !refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+      navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then(function (registration) {
+        // A home-screen app may stay open for days; check on launch instead of
+        // waiting for the browser's periodic service worker update check.
+        return registration.update();
+      }).catch(function () {});
     });
   }
 })();
