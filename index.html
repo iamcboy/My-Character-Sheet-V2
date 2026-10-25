@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>My Character Sheet</title>
 <meta name="theme-color" content="#e9edf0">
+<script>
+  try {
+    var savedTheme = localStorage.getItem("kosi-character-sheet-theme");
+    if (savedTheme === "light" || savedTheme === "dark") document.documentElement.setAttribute("data-theme", savedTheme);
+  } catch (e) {}
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="My Character Sheet">
 <link rel="manifest" href="./manifest.webmanifest">
@@ -14,7 +20,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-/* Layout: a top bar (sync status + Customize), then two columns on wide screens. Left holds the character card and today's quests grouped by stat; right holds stat levels, the 7-day log and the current book. One column on phones. */
+/* Layout: character and quest panels stay in the main area; progress becomes a scrollable side rail on wide screens and stacks on smaller screens. */
 :root {
   --bg: #e9edf0;
   --surface: #f9fafb;
@@ -32,6 +38,7 @@
   --oli: #5c7a14;
   --stl: #5d6b7a;
   --on-fill: #ffffff;
+  color-scheme: light;
   --font-display: "Press Start 2P", "Courier New", monospace;
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -89,11 +96,21 @@ body {
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.page { max-width: 980px; margin: 0 auto; }
+.page { max-width: 1320px; margin: 0 auto; }
 .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; min-height: 34px; }
-.wrap { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+.layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.wrap { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.bar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 @media (min-width: 860px) {
   .wrap { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+}
+.progress-sidebar { min-width: 0; }
+.progress-sidebar[hidden] { display: none; }
+.page.progress-hidden { max-width: 1640px; }
+.page.progress-hidden .layout { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) {
+  .layout { grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; }
+  .progress-sidebar { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
 }
 .col { display: grid; gap: 16px; min-width: 0; }
 
@@ -136,14 +153,51 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
 .lv .num { font-family: var(--font-display); font-size: 40px; line-height: 1; color: var(--xp); margin-top: 6px; font-variant-numeric: tabular-nums; }
 .xprow { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; gap: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
 .xprow b { color: var(--ink); font-weight: 500; }
+.xpbar { height: 12px; margin-top: 8px; overflow: hidden; background: var(--line); border-radius: 2px; }
+.xpbar span { display: block; height: 100%; width: 0; background: var(--xp-fill); transition: width .65s cubic-bezier(.2,.75,.25,1); }
+.xpbar.level-up { animation: xp-flash .75s ease-out; }
 .pips { display: flex; gap: 3px; margin-top: 8px; }
 .pips i { flex: 1; height: 12px; background: var(--line); border-radius: 1px; }
 .pips i.on { background: var(--c, var(--xp-fill)); }
 .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 .fact .v { font-family: var(--font-mono); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .fact .l { font-size: 12px; color: var(--muted); }
-.note { min-height: 0; margin: 14px 0 0; padding: 8px 12px; border: 1px solid var(--xp-fill); border-radius: 4px; color: var(--ink); font-size: 14px; }
+.note {
+  position: fixed; z-index: 1000; left: 50%; bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center; gap: 14px; width: min(560px, calc(100vw - 32px));
+  margin: 0; padding: 12px 14px; transform: translateX(-50%); border: 2px solid var(--xp-fill);
+  border-radius: 6px; color: var(--ink); background: var(--surface); box-shadow: 0 8px 30px rgb(0 0 0 / .22); font-size: 14px;
+}
 .note[hidden] { display: none; }
+.note.feedback { animation: feedback-in .32s ease-out; }
+.note.is-major { padding: 16px 18px; box-shadow: 0 10px 36px rgb(0 0 0 / .3), 0 0 0 4px color-mix(in srgb, var(--xp-fill) 24%, transparent); }
+.note-copy { flex: 1; font-weight: 500; }
+.note.is-major .note-copy { font-size: 16px; }
+.note .btn { flex-shrink: 0; }
+.quest-glow {
+  position: fixed; z-index: 997; inset: 0; border: 6px solid var(--glow-color); opacity: 0;
+  box-shadow: inset 0 0 38px 8px color-mix(in srgb, var(--glow-color) 62%, transparent), 0 0 28px 5px color-mix(in srgb, var(--glow-color) 55%, transparent);
+  pointer-events: none;
+}
+.quest-glow.play { animation: edge-glow .95s ease-out forwards; }
+#levelFx { position: fixed; z-index: 996; inset: 0; overflow: hidden; pointer-events: none; }
+.level-arrow {
+  position: absolute; bottom: -8vh; color: var(--xp-fill); font: 600 30px/1 var(--font-mono);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--xp-fill) 75%, transparent);
+  animation: arrow-rise 1.75s cubic-bezier(.2,.6,.3,1) both;
+}
+@keyframes edge-glow { 0%, 100% { opacity: 0; } 18% { opacity: .92; } 48% { opacity: .52; } }
+@keyframes arrow-rise {
+  0% { opacity: 0; transform: translate3d(0, 20px, 0) rotate(-7deg) scale(.72); }
+  16% { opacity: .92; }
+  100% { opacity: 0; transform: translate3d(var(--drift), -115vh, 0) rotate(8deg) scale(1.24); }
+}
+.lv.level-up .num { animation: level-up-pop .72s cubic-bezier(.2,.8,.25,1.2); }
+@keyframes feedback-in { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
+@keyframes level-up-pop { 0% { transform: scale(1); text-shadow: 0 0 0 transparent; } 35% { transform: scale(1.18); text-shadow: 0 0 18px var(--xp-fill); } 100% { transform: scale(1); text-shadow: 0 0 0 transparent; } }
+@keyframes xp-flash { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 40% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--xp-fill) 30%, transparent); } }
+@keyframes quest-pop { 0% { transform: scale(1); } 50% { transform: scale(1.04); } 100% { transform: scale(1); } }
+@keyframes milestone-pop { 0% { opacity: .5; transform: translateY(5px) scale(.98); } 70% { transform: translateY(0) scale(1.015); } 100% { opacity: 1; transform: none; } }
 
 /* quests */
 .qhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
@@ -160,6 +214,7 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
 }
 .quest:hover { border-color: var(--c); }
 .quest:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+.quest.just-completed { animation: quest-pop .38s ease-out; }
 .box { width: 30px; height: 30px; border: 2px solid var(--c); border-radius: 3px; display: grid; place-items: center; color: var(--on-fill); }
 .box svg { width: 18px; height: 18px; opacity: 0; }
 .quest[aria-pressed="true"] .box { background: var(--c); }
@@ -186,7 +241,8 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
 .srow .lvl { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .srow .pips i { height: 8px; }
 .sedit { display: grid; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-.sedit .line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.sedit .line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.sedit.archived { opacity: .78; }
 
 /* week */
 .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
@@ -224,8 +280,11 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
 .break-track { height: 8px; background: var(--line); border-radius: 8px; overflow: hidden; }
 .break-fill { height: 100%; background: var(--c); border-radius: inherit; }
 .milestones { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
-.milestones li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.milestones li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13px; }
+.milestones li span { min-width: 0; }
+.milestones small { display: block; color: var(--muted); font-size: 11px; }
 .milestones time { color: var(--muted); font: 11px var(--font-mono); }
+.milestones li.new-milestone { animation: milestone-pop .48s ease-out; }
 
 /* book */
 .book label { display: block; margin-top: 10px; font-size: 13px; color: var(--muted); }
@@ -251,18 +310,34 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
   .reward { grid-column: 2; }
   .panel { padding: 16px; }
 }
-@media (prefers-reduced-motion: reduce) { .quest { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .quest { transition: none; }
+  .xpbar span { transition: none; }
+  .xpbar.level-up, .note.feedback, .lv.level-up .num, .milestones li.new-milestone, .quest.just-completed, .quest-glow.play, .level-arrow { animation: none; }
+  .quest-glow.play { opacity: 0; }
+}
 </style>
 </head>
 <body>
-<div class="page">
+<div class="page" id="sheetPage">
   <div class="bar">
     <div class="status" id="status" aria-live="polite"></div>
-    <button type="button" class="btn" id="editBtn" data-act="toggle-edit" aria-pressed="false">Customize</button>
+    <div class="bar-actions">
+      <button type="button" class="btn" id="progressToggle" data-act="toggle-progress" aria-controls="progressSidebar" aria-expanded="true">Hide progress</button>
+      <button type="button" class="btn" id="themeToggle" data-act="toggle-theme" aria-pressed="false">Use dark mode</button>
+      <button type="button" class="btn" id="editBtn" data-act="toggle-edit" aria-pressed="false">Customize</button>
+    </div>
   </div>
 
-  <main class="wrap">
-    <div class="col">
+  <div class="note" id="note" role="status" aria-live="polite" hidden>
+    <span class="note-copy" id="noteMessage"></span>
+    <button type="button" class="btn" data-act="dismiss-feedback" aria-label="Dismiss notification">Dismiss</button>
+  </div>
+  <div class="quest-glow" id="questGlow" aria-hidden="true"></div>
+  <div id="levelFx" aria-hidden="true"></div>
+  <main class="layout">
+    <div class="wrap">
+      <div class="col">
       <section class="panel" aria-label="Character sheet">
         <div class="who">
           <div id="whoBlock"></div>
@@ -271,14 +346,13 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
             <div class="num" id="lvnum">1</div>
           </div>
         </div>
-        <div class="xprow"><span><b id="xpnow">0</b> / 20 XP to next level</span><span id="xptotal"></span></div>
-        <div class="pips" id="xppips" role="img" aria-label="XP progress"></div>
+        <div class="xprow"><span><b id="xpnow">0</b> / <span id="xpneeded">5</span> XP to next level</span><span id="xptotal"></span></div>
+        <div class="xpbar" id="xpbar" role="progressbar" aria-label="Progress to next level" aria-valuemin="0" aria-valuenow="0" aria-valuemax="5"><span id="xpfill"></span></div>
         <div class="facts">
           <div class="fact"><div class="v" id="fstreak">0</div><div class="l">Day streak</div></div>
           <div class="fact"><div class="v" id="fperfect">0</div><div class="l">Perfect days</div></div>
           <div class="fact"><div class="v" id="ftotal">0</div><div class="l">Quests done</div></div>
         </div>
-        <p class="note" id="note" role="status" aria-live="polite" hidden></p>
       </section>
 
       <section class="panel" aria-labelledby="qh">
@@ -289,19 +363,29 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
         <div id="quests"></div>
         <p class="rule" id="rule"></p>
       </section>
+      </div>
+
+      <div class="col">
+        <section class="panel" aria-labelledby="sh">
+          <h2 id="sh">Stats</h2>
+          <div class="statlist" id="stats"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="wh">
+          <h2 id="wh">Last 7 days</h2>
+          <div class="week" id="week"></div>
+        </section>
+
+        <section class="panel book" aria-labelledby="bh">
+          <h2 id="bh">Current book</h2>
+          <label for="book">What are you reading right now?</label>
+          <input id="book" class="in" data-field="book" type="text" maxlength="120" placeholder="Pick one you actually want to finish" autocomplete="off">
+          <p>Short and practical works best for the first one. Finishing early gives you a quick win.</p>
+        </section>
+      </div>
     </div>
 
-    <div class="col">
-      <section class="panel" aria-labelledby="sh">
-        <h2 id="sh">Stats</h2>
-        <div class="statlist" id="stats"></div>
-      </section>
-
-      <section class="panel" aria-labelledby="wh">
-        <h2 id="wh">Last 7 days</h2>
-        <div class="week" id="week"></div>
-      </section>
-
+    <aside class="progress-sidebar" id="progressSidebar">
       <section class="panel" aria-labelledby="ph">
         <h2 id="ph">Progress</h2>
         <div class="progress-tools" role="group" aria-label="Progress time range">
@@ -318,17 +402,10 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
         <div class="bar-chart" id="progressChart" role="img" aria-label="Weekly quest completions"></div>
         <h3 class="progress-subhead">By stat</h3>
         <div class="breakdown" id="progressBreakdown"></div>
-        <h3 class="progress-subhead">Level milestones</h3>
+        <h3 class="progress-subhead">Milestones</h3>
         <ul class="milestones" id="milestones"></ul>
       </section>
-
-      <section class="panel book" aria-labelledby="bh">
-        <h2 id="bh">Current book</h2>
-        <label for="book">What are you reading right now?</label>
-        <input id="book" class="in" data-field="book" type="text" maxlength="120" placeholder="Pick one you actually want to finish" autocomplete="off">
-        <p>Short and practical works best for the first one. Finishing early gives you a quick win.</p>
-      </section>
-    </div>
+    </aside>
   </main>
 </div>
 
@@ -345,13 +422,25 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
     { str: "30 pushups + 30 squats, or a 30-minute run", int: "Read 25 pages", foc: "One 60-minute block, phone in another room", spi: "20 to 30 minutes of quiet time" }
   ];
   var ID_RE = /^[a-z0-9_]{1,40}$/, DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-  var XP_PER_LEVEL = 20, STAT_LEVEL = 10, KEEP_DAYS = 120, MAX_STATS = 8, MAX_QUESTS = 24;
+  var FIRST_LEVEL_XP = 5, XP_STEP = 3, STAT_LEVEL = 10, KEEP_DAYS = 120, MAX_STATS = 8, MAX_QUESTS = 24;
+  var MILESTONES = [
+    { id: "quests-1", type: "quests", value: 1, label: "First quest", detail: "Complete 1 quest" },
+    { id: "quests-10", type: "quests", value: 10, label: "Getting started", detail: "Complete 10 quests" },
+    { id: "level-5", type: "level", value: 5, label: "Level 5", detail: "Reach level 5" },
+    { id: "quests-25", type: "quests", value: 25, label: "Building momentum", detail: "Complete 25 quests" },
+    { id: "quests-50", type: "quests", value: 50, label: "Quest veteran", detail: "Complete 50 quests" },
+    { id: "level-10", type: "level", value: 10, label: "Level 10", detail: "Reach level 10" },
+    { id: "quests-100", type: "quests", value: 100, label: "Century", detail: "Complete 100 quests" },
+    { id: "level-20", type: "level", value: 20, label: "Level 20", detail: "Reach level 20" },
+    { id: "quests-250", type: "quests", value: 250, label: "Dedicated adventurer", detail: "Complete 250 quests" },
+    { id: "quests-500", type: "quests", value: 500, label: "Five hundred quests", detail: "Complete 500 quests" }
+  ];
   var LS_KEY = "kosi-character-sheet-v1";
   var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
   function defaults() {
     return {
-      v: 2,
+      v: 3,
       profile: { name: "Kosi", klass: "Self-Improver" },
       stats: [
         { id: "str", name: "Strength", color: "str" },
@@ -367,6 +456,9 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
       ],
       log: {},
       perfect: [],
+      totalXp: 0,
+      questXp: {},
+      achievements: {},
       book: ""
     };
   }
@@ -375,6 +467,8 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
   var ref = null;
   var editing = false;
   var progressDays = 30;
+  var feedbackTimer = null;
+  var levelFxTimer = null;
   var newQ = { text: "", stat: "str" };
   var newS = { name: "", color: "pnk" };
   var $ = function (id) { return document.getElementById(id); };
@@ -431,6 +525,33 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
       // Saved before customizing existed: a perfect day had all four default quests done.
       Object.keys(out.log).forEach(function (k) { if (out.log[k].length >= 4) out.perfect.push(k); });
     }
+    var known = {}, loggedXp = 0;
+    out.quests.forEach(function (q) { known[q.id] = 1; });
+    Object.keys(out.log).forEach(function (k) {
+      out.log[k].forEach(function (id) { if (known[id]) loggedXp++; });
+    });
+    out.totalXp = Number.isSafeInteger(raw.totalXp) && raw.totalXp >= 0 ? Math.max(raw.totalXp, loggedXp) : loggedXp;
+    var loggedPerQuest = {};
+    Object.keys(out.log).forEach(function (k) {
+      out.log[k].forEach(function (id) { if (known[id]) loggedPerQuest[id] = (loggedPerQuest[id] || 0) + 1; });
+    });
+    out.quests.forEach(function (q) {
+      var saved = raw.questXp && Number.isSafeInteger(raw.questXp[q.id]) && raw.questXp[q.id] >= 0 ? raw.questXp[q.id] : 0;
+      var count = Math.max(saved, loggedPerQuest[q.id] || 0);
+      if (count) out.questXp[q.id] = count;
+    });
+    var questTotalXp = Object.keys(out.questXp).reduce(function (sum, id) { return sum + out.questXp[id]; }, 0);
+    out.totalXp = Math.max(out.totalXp, questTotalXp);
+    if (raw.achievements && typeof raw.achievements === "object") {
+      MILESTONES.forEach(function (m) {
+        var value = raw.achievements[m.id];
+        if (typeof value === "string" && (!value || DATE_RE.test(value))) out.achievements[m.id] = value;
+      });
+    }
+    MILESTONES.forEach(function (m) {
+      var reached = m.type === "quests" ? out.totalXp >= m.value : levelOf(out.totalXp) >= m.value;
+      if (reached && !Object.prototype.hasOwnProperty.call(out.achievements, m.id)) out.achievements[m.id] = "";
+    });
     return out;
   }
 
@@ -443,21 +564,33 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
     });
     return out;
   }
-  function doneOn(k) { var m = qmap(); return (state.log[k] || []).filter(function (id) { return m[id]; }); }
+  function doneOn(k) {
+    var m = qmap();
+    return (state.log[k] || []).filter(function (id) {
+      var q = m[id], stat = q && findStat(q.stat);
+      return !!q && !!stat && !stat.archived;
+    });
+  }
 
   function totals() {
-    var m = qmap(), xp = 0, per = {};
-    Object.keys(state.log).forEach(function (k) {
-      state.log[k].forEach(function (id) {
-        var q = m[id];
-        if (!q) return;
-        xp++;
-        per[q.stat] = (per[q.stat] || 0) + 1;
-      });
+    var m = qmap(), per = {};
+    Object.keys(state.questXp).forEach(function (id) {
+      var q = m[id];
+      if (q) per[q.stat] = (per[q.stat] || 0) + state.questXp[id];
     });
-    return { xp: xp, per: per };
+    return { xp: state.totalXp, per: per };
   }
-  function levelOf(xp) { return 1 + Math.floor(xp / XP_PER_LEVEL); }
+  function xpForLevel(level) {
+    var completedLevels = Math.max(0, level - 1);
+    return completedLevels * (3 * completedLevels + 7) / 2;
+  }
+  function xpForNextLevel(level) { return FIRST_LEVEL_XP + (level - 1) * XP_STEP; }
+  function levelOf(xp) {
+    var level = 1 + Math.floor((Math.sqrt(49 + 24 * xp) - 7) / 6);
+    while (xpForLevel(level + 1) <= xp) level++;
+    while (level > 1 && xpForLevel(level) > xp) level--;
+    return level;
+  }
   function questText(q, level) {
     if (q.auto) { var t = TIERS[Math.min(level, TIERS.length) - 1][q.id]; if (t) return t; }
     return q.text || "";
@@ -507,11 +640,14 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
   }
 
   function renderCard(t, level) {
-    var into = t.xp % XP_PER_LEVEL;
+    var into = t.xp - xpForLevel(level), needed = xpForNextLevel(level);
     $("lvnum").textContent = level;
     $("xpnow").textContent = into;
+    $("xpneeded").textContent = needed;
     $("xptotal").textContent = t.xp + " XP total";
-    $("xppips").innerHTML = pips(XP_PER_LEVEL, into);
+    $("xpbar").setAttribute("aria-valuenow", into);
+    $("xpbar").setAttribute("aria-valuemax", needed);
+    $("xpfill").style.width = Math.min(100, into / needed * 100) + "%";
     $("fstreak").textContent = streak();
     $("fperfect").textContent = state.perfect.length;
     $("ftotal").textContent = t.xp;
@@ -559,21 +695,23 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
         }).join("") + "</ul></section>";
     }).join("");
     $("quests").innerHTML = html || '<p class="empty">No quests yet. Tap Customize to add your first one.</p>';
-    $("rule").textContent = "Each quest is worth 1 XP. Every " + XP_PER_LEVEL + " XP is a new level. Miss a day? Skip it and start fresh tomorrow. No catch-up.";
+    $("rule").textContent = "Every completed quest earns 1 XP. Each new level takes 3 more XP than the last, so your progress grows at a steady pace.";
   }
 
   function renderStats(t) {
     var as = activeStats();
     if (editing) {
-      $("stats").innerHTML = as.map(function (s) {
-        return '<div class="sedit"><div class="line"><input class="in" data-field="sname" data-s="' + s.id + '" maxlength="24" value="' + esc(s.name) + '" aria-label="Stat name" autocomplete="off">' +
-          '<button type="button" class="btn" data-act="del-stat" data-s="' + s.id + '"' + (as.length <= 1 ? " disabled" : "") + ">Remove</button></div>" +
-          swatches(s.color, "color", s.id) + "</div>";
+      $("stats").innerHTML = state.stats.map(function (s) {
+        var cannotHideLast = !s.archived && as.length <= 1;
+        return '<div class="sedit' + (s.archived ? ' archived' : '') + '"><div class="line"><input class="in" data-field="sname" data-s="' + s.id + '" maxlength="24" value="' + esc(s.name) + '" aria-label="Stat name" autocomplete="off">' +
+          '<button type="button" class="btn" data-act="stat-archive" data-s="' + s.id + '"' + (cannotHideLast ? " disabled" : "") + '>' + (s.archived ? "Unarchive" : "Archive") + '</button>' +
+          '<button type="button" class="btn" data-act="stat-delete" data-s="' + s.id + '"' + (cannotHideLast ? " disabled" : "") + ">Delete</button></div>" +
+          (s.archived ? '<p class="hint">Archived — hidden from the sheet and progress. Your data is kept.</p>' : swatches(s.color, "color", s.id)) + "</div>";
       }).join("") +
         '<div class="addbox" style="margin-top:0;border-top:0;padding-top:0"><label class="fl" for="newS">New stat</label><input id="newS" class="in" data-field="news" maxlength="24" value="' + esc(newS.name) + '" placeholder="e.g. Discipline" autocomplete="off">' +
         '<div style="margin-top:8px">' + swatches(newS.color, "newcolor", "") + '</div>' +
         '<div style="margin-top:10px"><button type="button" class="btn primary" data-act="add-stat">Add stat</button></div>' +
-        '<p class="hint">Removing a stat hides it and its quests. The XP you earned stays.</p></div>';
+        '<p class="hint">Archive hides a stat and its progress while keeping its data. Delete permanently removes the stat, its quests, and their recorded progress.</p></div>';
       return;
     }
     $("stats").innerHTML = as.map(function (s) {
@@ -605,7 +743,7 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
     state.stats.forEach(function (s) { per[s.id] = 0; });
     for (var i = 0; i <= from; i++) {
       var d = new Date(start); d.setDate(start.getDate() + i);
-      var key = keyOf(d), ids = (state.log[key] || []).filter(function (id) { return !!qmapNow[id]; });
+      var key = keyOf(d), ids = doneOn(key);
       days.push({ key: key, date: d, count: ids.length });
       total += ids.length;
       if (ids.length) { activeDays++; run++; bestRun = Math.max(bestRun, run); }
@@ -642,22 +780,21 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
     $("progressChart").innerHTML = chart;
 
     var maxStat = Math.max(1, ...Object.keys(per).map(function (id) { return per[id] || 0; }));
-    $("progressBreakdown").innerHTML = state.stats.map(function (s) {
+    $("progressBreakdown").innerHTML = activeStats().map(function (s) {
       var n = per[s.id] || 0;
       return '<div class="break-row" style="--c:' + cv(s.color) + '"><span>' + esc(s.name) + '</span><span class="break-track"><span class="break-fill" style="display:block;width:' + Math.round(n / maxStat * 100) + '%"></span></span><strong>' + n + '</strong></div>';
     }).join("") || '<p class="empty">No stats yet.</p>';
 
-    var dateKeys = Object.keys(state.log).sort(), xp = 0, achieved = [];
-    dateKeys.forEach(function (date) {
-      var count = (state.log[date] || []).filter(function (id) { return !!qmapNow[id]; }).length;
-      var previousLevel = levelOf(xp);
-      xp += count;
-      for (var reached = previousLevel + 1; reached <= levelOf(xp); reached++) achieved.push({ level: reached, date: date });
-    });
-    var recent = achieved.slice(-5).reverse();
-    $("milestones").innerHTML = recent.length ? recent.map(function (m) {
-      return '<li><span>Reached level ' + m.level + '</span><time datetime="' + m.date + '">' + new Date(m.date + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + '</time></li>';
-    }).join("") : '<li class="empty">Your first level-up will appear here.</li>';
+    var unlocked = MILESTONES.filter(function (m) { return Object.prototype.hasOwnProperty.call(state.achievements, m.id); });
+    var upcoming = MILESTONES.filter(function (m) { return !Object.prototype.hasOwnProperty.call(state.achievements, m.id); }).slice(0, 3);
+    var shown = unlocked.slice(-4).reverse().map(function (m) { return { milestone: m, date: state.achievements[m.id], done: true }; })
+      .concat(upcoming.map(function (m) { return { milestone: m, date: "", done: false }; }));
+    $("milestones").innerHTML = shown.length ? shown.map(function (item) {
+      var m = item.milestone, date = item.date && DATE_RE.test(item.date)
+        ? new Date(item.date + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+        : (item.done ? "Achieved" : (m.type === "quests" ? Math.min(state.totalXp, m.value) + "/" + m.value + " XP" : "Level " + levelOf(state.totalXp) + "/" + m.value));
+      return '<li' + (item.done ? ' data-milestone="' + esc(m.id) + '"' : '') + '><span>' + (item.done ? "✓ " : "○ ") + esc(m.label) + ' <small>' + esc(m.detail) + '</small></span><time>' + esc(date) + '</time></li>';
+    }).join("") : '<li class="empty">Your milestones will appear here.</li>';
 
     Array.prototype.forEach.call(document.querySelectorAll('[data-act="progress-range"]'), function (button) {
       button.setAttribute("aria-pressed", Number(button.getAttribute("data-days")) === progressDays);
@@ -675,8 +812,26 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
     renderProgress();
   }
 
+  function applyTheme(theme, save) {
+    var dark = theme === "dark" || (!theme && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (theme === "dark" || theme === "light") document.documentElement.setAttribute("data-theme", theme);
+    else document.documentElement.removeAttribute("data-theme");
+    $("themeToggle").setAttribute("aria-pressed", dark);
+    $("themeToggle").textContent = dark ? "Use light mode" : "Use dark mode";
+    document.querySelector('meta[name="theme-color"]').setAttribute("content", dark ? "#0e1217" : "#e9edf0");
+    if (save) {
+      try { localStorage.setItem("kosi-character-sheet-theme", dark ? "dark" : "light"); } catch (e) {}
+    }
+  }
+
   /* ---------- saving ---------- */
   function setStatus(msg) { $("status").textContent = msg; }
+  function hideFeedback() {
+    clearTimeout(feedbackTimer);
+    feedbackTimer = null;
+    $("note").hidden = true;
+    $("note").classList.remove("feedback", "is-major");
+  }
   function writeLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
   function readLocal() { try { var r = localStorage.getItem(LS_KEY); return r ? normalize(JSON.parse(r)) : null; } catch (e) { return null; } }
 
@@ -703,27 +858,168 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
   function findQuest(id) { return state.quests.filter(function (q) { return q.id === id; })[0]; }
   function findStat(id) { return state.stats.filter(function (s) { return s.id === id; })[0]; }
 
+  function reducedMotion() {
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function animateQuestGlow(id) {
+    if (reducedMotion()) return;
+    var quest = findQuest(id), stat = quest && findStat(quest.stat);
+    if (!stat) return;
+    var glow = $("questGlow");
+    glow.style.setProperty("--glow-color", "var(--" + stat.color + ")");
+    glow.classList.remove("play");
+    void glow.offsetWidth;
+    glow.classList.add("play");
+  }
+
+  function animateLevelArrows() {
+    if (reducedMotion()) return;
+    var fx = $("levelFx");
+    fx.textContent = "";
+    clearTimeout(levelFxTimer);
+    for (var i = 0; i < 14; i++) {
+      var arrow = document.createElement("span");
+      arrow.className = "level-arrow";
+      arrow.textContent = "↑";
+      arrow.style.left = (5 + i * 6.8 + Math.random() * 3) + "%";
+      arrow.style.animationDelay = (Math.random() * 0.55) + "s";
+      arrow.style.setProperty("--drift", (Math.random() * 80 - 40) + "px");
+      fx.appendChild(arrow);
+    }
+    levelFxTimer = setTimeout(function () {
+      fx.textContent = "";
+      levelFxTimer = null;
+    }, 2600);
+  }
+
+  function toggleStatArchive(id) {
+    var stat = findStat(id);
+    if (!stat) return;
+    if (!stat.archived && activeStats().length <= 1) { setStatus("Keep at least one active stat."); return; }
+    stat.archived = !stat.archived;
+    if (!newQ.stat || !activeStats().some(function (s) { return s.id === newQ.stat; })) newQ.stat = activeStats()[0].id;
+    syncPerfectToday();
+    render();
+    setStatus(stat.archived ? stat.name + " archived. Its data is kept." : stat.name + " unarchived. Its progress is back.");
+    persist();
+  }
+
+  function deleteStat(id) {
+    var stat = findStat(id);
+    if (!stat) return;
+    if (!stat.archived && activeStats().length <= 1) { setStatus("Keep at least one active stat."); return; }
+    if (!window.confirm('Delete "' + stat.name + '" and permanently remove its quests and recorded progress?')) return;
+
+    var ids = {}, removedXp = 0, removedDays = {};
+    state.quests.forEach(function (q) {
+      if (q.stat !== id) return;
+      ids[q.id] = 1;
+      removedXp += state.questXp[q.id] || 0;
+      delete state.questXp[q.id];
+    });
+    Object.keys(state.log).forEach(function (date) {
+      var before = state.log[date].length;
+      state.log[date] = state.log[date].filter(function (questId) { return !ids[questId]; });
+      if (state.log[date].length !== before) removedDays[date] = 1;
+      if (!state.log[date].length) delete state.log[date];
+    });
+    state.perfect = state.perfect.filter(function (date) { return !removedDays[date]; });
+    state.quests = state.quests.filter(function (q) { return q.stat !== id; });
+    state.stats = state.stats.filter(function (s) { return s.id !== id; });
+    state.totalXp = Math.max(0, state.totalXp - removedXp);
+    MILESTONES.forEach(function (m) {
+      var stillReached = m.type === "quests" ? state.totalXp >= m.value : levelOf(state.totalXp) >= m.value;
+      if (!stillReached) delete state.achievements[m.id];
+    });
+    if (!activeStats().some(function (s) { return s.id === newQ.stat; })) newQ.stat = activeStats()[0].id;
+    syncPerfectToday();
+    render();
+    setStatus(stat.name + " deleted. Removed " + removedXp + " XP and its saved progress.");
+    persist();
+  }
+
   function toggleQuest(id) {
     var today = keyOf(new Date());
-    var before = totals().xp;
+    var before = state.totalXp;
     var arr = (state.log[today] || []).slice();
     var at = arr.indexOf(id);
-    if (at === -1) arr.push(id); else arr.splice(at, 1);
+    if (at === -1) {
+      arr.push(id);
+      state.totalXp++;
+      state.questXp[id] = (state.questXp[id] || 0) + 1;
+    } else {
+      arr.splice(at, 1);
+      state.totalXp = Math.max(0, state.totalXp - 1);
+      state.questXp[id] = Math.max(0, (state.questXp[id] || 0) - 1);
+      if (!state.questXp[id]) delete state.questXp[id];
+    }
     if (arr.length) state.log[today] = arr; else delete state.log[today];
     syncPerfectToday();
     prune();
-    var after = totals().xp, note = $("note");
-    if (Math.floor(after / XP_PER_LEVEL) > Math.floor(before / XP_PER_LEVEL)) {
-      note.textContent = "Level up. You are now level " + levelOf(after) + ". Your starter quests are a notch harder.";
-      note.hidden = false;
-    } else if (state.perfect.indexOf(today) > -1) {
-      note.textContent = "Perfect day. All " + activeQuests().length + " quests done.";
-      note.hidden = false;
+    var after = state.totalXp, note = $("note"), messages = [], unlockedNow = [], didLevelUp = false;
+    if (at === -1) {
+      messages.push("Quest complete! +1 XP.");
+      if (levelOf(after) > levelOf(before)) {
+        didLevelUp = true;
+        messages.push("Level up! You reached level " + levelOf(after) + ".");
+      }
+      MILESTONES.forEach(function (m) {
+        var wasReached = m.type === "quests" ? before >= m.value : levelOf(before) >= m.value;
+        var isReached = m.type === "quests" ? after >= m.value : levelOf(after) >= m.value;
+        if (!wasReached && isReached) {
+          state.achievements[m.id] = today;
+          unlockedNow.push(m.id);
+          messages.push("Milestone unlocked: " + m.label + "!");
+        }
+      });
+      if (state.perfect.indexOf(today) > -1) messages.push("Perfect day! All " + activeQuests().length + " quests complete.");
     } else {
-      note.hidden = true;
+      messages.push("Quest unchecked. 1 XP removed.");
+      MILESTONES.forEach(function (m) {
+        var reached = m.type === "quests" ? after >= m.value : levelOf(after) >= m.value;
+        if (!reached) delete state.achievements[m.id];
+      });
     }
+    var isMajor = didLevelUp || unlockedNow.length > 0;
+    $("noteMessage").textContent = messages.join(" ");
+    note.classList.toggle("is-major", isMajor);
+    note.hidden = false;
     render();
+    clearTimeout(feedbackTimer);
+    note.classList.remove("feedback");
+    void note.offsetWidth;
+    note.classList.add("feedback");
+    if (!isMajor) {
+      feedbackTimer = setTimeout(function () {
+        note.hidden = true;
+        note.classList.remove("feedback");
+        feedbackTimer = null;
+      }, 5000);
+    }
     var again = document.querySelector('.quest[data-q="' + id + '"]');
+    if (at === -1) {
+      animateQuestGlow(id);
+      if (didLevelUp) animateLevelArrows();
+      if (again) {
+        again.classList.add("just-completed");
+        setTimeout(function () { again.classList.remove("just-completed"); }, 450);
+      }
+      if (didLevelUp) {
+        var levelBadge = $("lvnum").parentNode;
+        levelBadge.classList.add("level-up");
+        $("xpbar").classList.add("level-up");
+        setTimeout(function () {
+          levelBadge.classList.remove("level-up");
+          $("xpbar").classList.remove("level-up");
+        }, 850);
+      }
+      unlockedNow.forEach(function (milestoneId) {
+        var row = document.querySelector('[data-milestone="' + milestoneId + '"]');
+        if (row) row.classList.add("new-milestone");
+        if (row) setTimeout(function () { row.classList.remove("new-milestone"); }, 550);
+      });
+    }
     if (again) again.focus();
     persist();
   }
@@ -759,7 +1055,20 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
     if (!el || el.disabled) return;
     var act = el.getAttribute("data-act");
     var q = el.getAttribute("data-q"), s = el.getAttribute("data-s"), c = el.getAttribute("data-c");
-    if (act === "toggle-edit") { editing = !editing; $("note").hidden = true; render(); setStatus(""); }
+    if (act === "toggle-edit") { editing = !editing; hideFeedback(); render(); setStatus(""); }
+    else if (act === "dismiss-feedback") hideFeedback();
+    else if (act === "toggle-theme") {
+      var isDark = document.documentElement.getAttribute("data-theme") === "dark" ||
+        (!document.documentElement.hasAttribute("data-theme") && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      applyTheme(isDark ? "light" : "dark", true);
+    }
+    else if (act === "toggle-progress") {
+      var sidebar = $("progressSidebar"), show = sidebar.hidden;
+      sidebar.hidden = !show;
+      $("sheetPage").classList.toggle("progress-hidden", !show);
+      $("progressToggle").setAttribute("aria-expanded", show);
+      $("progressToggle").textContent = show ? "Hide progress" : "Show progress";
+    }
     else if (act === "progress-range") { progressDays = Number(el.getAttribute("data-days")) || 30; renderProgress(); }
     else if (act === "quest") toggleQuest(q);
     else if (act === "del-quest") {
@@ -767,14 +1076,8 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
       if (qq) { qq.archived = true; syncPerfectToday(); render(); persist(); }
     }
     else if (act === "add-quest") addQuest();
-    else if (act === "del-stat") {
-      var st = findStat(s);
-      if (st && activeStats().length > 1) {
-        st.archived = true;
-        state.quests.forEach(function (x) { if (x.stat === s) x.archived = true; });
-        syncPerfectToday(); render(); persist();
-      }
-    }
+    else if (act === "stat-archive") toggleStatArchive(s);
+    else if (act === "stat-delete") deleteStat(s);
     else if (act === "color") {
       var st2 = findStat(s);
       if (st2 && COLORS.indexOf(c) > -1) { st2.color = c; render(); persist(); }
@@ -840,6 +1143,9 @@ h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.
 
   /* ---------- start ---------- */
   var local = readLocal();
+  var savedTheme = null;
+  try { savedTheme = localStorage.getItem("kosi-character-sheet-theme"); } catch (e) {}
+  applyTheme(savedTheme === "light" || savedTheme === "dark" ? savedTheme : null, false);
   if (local) state = local;
   newS.color = nextColor();
   newQ.stat = activeStats()[0].id;
